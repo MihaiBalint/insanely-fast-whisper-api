@@ -144,6 +144,8 @@ def root(
     allowed_url_schemes = {"http", "https", "file"}
     if parsed_url.scheme.lower() not in allowed_url_schemes:
         raise HTTPException(status_code=400, detail="Invalid URL")
+    elif parsed_url.scheme.lower() == "file":
+        url = url[len(f"{parsed_url.scheme}://") :]
     elif parsed_url.scheme.lower() != "file" and not parsed_url.netloc:
         raise HTTPException(status_code=400, detail="Invalid or insecure URL")
 
