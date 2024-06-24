@@ -9,6 +9,7 @@ from fastapi import (
 )
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
+from urllib.parse import urlparse
 import torch
 from transformers import pipeline
 from .diarization_pipeline import diarize
@@ -35,7 +36,10 @@ pipe = pipeline(
     model="openai/whisper-large-v3",
     torch_dtype=torch.float16,
     device="cuda:0",
-    model_kwargs=({"attn_implementation": "flash_attention_2"}),
+    model_kwargs={
+        "attn_implementation": "flash_attention_2",
+        "use_flash_attention_2": True,
+    },
 )
 
 app = FastAPI()
@@ -114,10 +118,10 @@ def process(
 @app.middleware("http")
 async def admin_key_auth_check(request: Request, call_next):
     if admin_key is not None:
-        if ("x-admin-api-key" not in request.headers) or (
-            request.headers["x-admin-api-key"] != admin_key
-        ):
+        if "x-admin-api-key" not in request.headers:
             return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
+        if request.headers["x-admin-api-key"] != admin_key:
+            return JSONResponse(status_code=403, content={"detail": "Forbidden"})
     response = await call_next(request)
     return response
 
@@ -136,16 +140,16 @@ def root(
     is_async: bool = Body(default=False),
     managed_task_id: str | None = Body(default=None),
 ):
-    if url.lower().startswith("http") is False:
-        raise HTTPException(status_code=400, detail="Invalid URL")
+    parsed_url = urlparse(url)
+    allowed_url_schemes = {"http", "https", "file"}
+    if parsed_url.scheme.lower() not in allowed_url_schemes or not parsed_url.netloc:
+        raise HTTPException(status_code=400, detail="Invalid or insecure URL")
 
     if diarise_audio is True and hf_token is None:
         raise HTTPException(status_code=500, detail="Missing Hugging Face Token")
 
     if is_async is True and webhook is None:
-        raise HTTPException(
-            status_code=400, detail="Webhook is required for async tasks"
-        )
+        raise HTTPException(status_code=400, detail="Webhook is required for async tasks")
 
     task_id = managed_task_id if managed_task_id is not None else str(uuid.uuid4())
 
