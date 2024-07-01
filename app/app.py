@@ -12,7 +12,6 @@ from pydantic import BaseModel
 from urllib.parse import urlparse
 import torch
 from transformers import pipeline
-from .diarization_pipeline import diarize
 import requests
 import asyncio
 import uuid
@@ -78,13 +77,6 @@ def process(
             return_timestamps="word" if timestamp == "word" else True,
         )
 
-        if diarise_audio is True:
-            speakers_transcript = diarize(
-                hf_token,
-                url,
-                outputs,
-            )
-            outputs["speakers"] = speakers_transcript
     except asyncio.CancelledError:
         errorMessage = "Task Cancelled"
     except Exception as e:
