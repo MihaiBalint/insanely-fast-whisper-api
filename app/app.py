@@ -68,7 +68,6 @@ def process(
             "task": task,
             "language": None if language == "None" else language,
         }
-
         outputs = pipe(
             url,
             chunk_length_s=30,
@@ -123,7 +122,7 @@ def root(
     url: str = Body(),
     task: str = Body(default="transcribe", enum=["transcribe", "translate"]),
     language: str = Body(default="None"),
-    batch_size: int = Body(default=64),
+    batch_size: int = Body(default=32),
     timestamp: str = Body(default="chunk", enum=["chunk", "word"]),
     diarise_audio: bool = Body(
         default=False,
