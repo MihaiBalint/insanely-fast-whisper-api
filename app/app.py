@@ -15,6 +15,7 @@ from transformers import pipeline
 import requests
 import asyncio
 import uuid
+import app.lib as lib
 
 
 admin_key = os.environ.get(
@@ -26,9 +27,7 @@ hf_token = os.environ.get(
 )
 
 # fly runtime env https://fly.io/docs/machines/runtime-environment
-fly_machine_id = os.environ.get(
-    "FLY_MACHINE_ID",
-)
+fly_machine_id = os.environ.get("FLY_MACHINE_ID")
 
 pipe = pipeline(
     "automatic-speech-recognition",
@@ -64,17 +63,7 @@ def process(
     errorMessage: str | None = None
     outputs = {}
     try:
-        generate_kwargs = {
-            "task": task,
-            "language": None if language == "None" else language,
-        }
-        outputs = pipe(
-            url,
-            chunk_length_s=30,
-            batch_size=batch_size,
-            generate_kwargs=generate_kwargs,
-            return_timestamps="word" if timestamp == "word" else True,
-        )
+        outputs = lib.process_dividing_batch_size(url, task, language, batch_size, timestamp, pipeline_function=pipe)
 
     except asyncio.CancelledError:
         errorMessage = "Task Cancelled"
