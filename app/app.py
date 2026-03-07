@@ -1,10 +1,8 @@
 import os
 from fastapi import (
     FastAPI,
-    Header,
     HTTPException,
     Body,
-    BackgroundTasks,
     Request,
 )
 from fastapi.responses import JSONResponse
@@ -16,6 +14,7 @@ import requests
 import asyncio
 import uuid
 import app.lib as lib
+from app.routers.openai import create_openai_router
 
 
 admin_key = os.environ.get(
@@ -28,10 +27,11 @@ hf_token = os.environ.get(
 
 # fly runtime env https://fly.io/docs/machines/runtime-environment
 fly_machine_id = os.environ.get("FLY_MACHINE_ID")
+whisper_model_id = "openai/whisper-large-v3"
 
 pipe = pipeline(
     "automatic-speech-recognition",
-    model="openai/whisper-large-v3",
+    model=whisper_model_id,
     torch_dtype=torch.float16,
     device="cuda:0",
     model_kwargs={
@@ -95,12 +95,22 @@ def process(
     return outputs
 
 
+app.include_router(create_openai_router(process, whisper_model_id))
+
+
 @app.middleware("http")
 async def admin_key_auth_check(request: Request, call_next):
     if admin_key is not None:
-        if "x-admin-api-key" not in request.headers:
+        header_key = request.headers.get("x-admin-api-key")
+        authorization = request.headers.get("authorization")
+
+        bearer_key = None
+        if authorization is not None and authorization.lower().startswith("bearer "):
+            bearer_key = authorization[7:].strip()
+
+        if header_key is None and bearer_key is None:
             return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
-        if request.headers["x-admin-api-key"] != admin_key:
+        if header_key != admin_key and bearer_key != admin_key:
             return JSONResponse(status_code=403, content={"detail": "Forbidden"})
     response = await call_next(request)
     return response
